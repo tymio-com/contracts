@@ -14,8 +14,6 @@ const {
 const {
   setRatio,
   setAcceptableTokens,
-  setSwapRouter,
-  setWeth,
   getSwapsOutMinimal,
 } = require('./includes/contract');
 const {
@@ -49,7 +47,7 @@ describe('Expiration', async () => {
   it('Deploy contracts', async () => {
     tokens = await deployTokens();
     swapRouter = await deploySwapRouter();
-    payer = await deployPayer();
+    payer = await deployPayer(swapRouter.address, tokens.weth.address);
   });
   it('Prepare contract for expiration', async () => {
     expiration = expirations[60];
@@ -75,12 +73,6 @@ describe('Expiration', async () => {
   });
   it('Set acceptable tokens', async () => {
     await setAcceptableTokens(payer, tokensV3);
-  });
-  it('Set weth', async () => {
-    await setWeth(payer, users, tokensV3);
-  });
-  it('Set swapRouter', async () => {
-    await setSwapRouter(payer, users, swapRouter);
   });
   it('Set payer address', async () => {
     const user = users[0];

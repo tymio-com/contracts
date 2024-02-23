@@ -2,28 +2,6 @@ const { expect } = require('chai');
 const { DECIMALS } = require('./constants');
 const { sToken, thowDotPart, cToken, roudToDecimals } = require('./utils');
 
-async function setSwapRouter(payer, users, swapRouter) {
-  const args = [swapRouter.address];
-  const user = users[0];
-  expect(payer.connect(user).setSwapRouter(...args)).to.be.revertedWith(
-    'NOT THE OWNERS'
-  );
-  tx = await payer.setSwapRouter(...args);
-  await tx.wait();
-  expect(await payer.swapRouter()).to.equal(swapRouter.address);
-}
-
-async function setWeth(payer, users, tokens) {
-  const args = [tokens['WETH'].address];
-  const user = users[0];
-  expect(payer.connect(user).setWeth(...args)).to.be.revertedWith(
-    'NOT THE OWNERS'
-  );
-  tx = await payer.setWeth(...args);
-  await tx.wait();
-  expect(await payer.wethAddress()).to.equal(tokens['WETH'].address);
-}
-
 async function setAcceptableTokens(payer, tokens) {
   tx = await payer.editAcceptableToken(tokens['USDC'].address, true, true);
   await tx.wait();
@@ -188,8 +166,6 @@ async function getSwapsOutMinimal(payer, args, prices, tokensV3) {
 module.exports = {
   setRatio,
   setAcceptableTokens,
-  setSwapRouter,
-  setWeth,
   getAcceptableTokens,
   getSwapsOutMinimal,
 };

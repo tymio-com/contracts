@@ -32,9 +32,11 @@ contract PayerV3 {
         bool[] swap; // Array indicating which orders should perform a swap.
         uint256[] additionalAmount; // Array of additional amounts for each order.
     }
-    constructor() {
+    constructor(address _swapRouter, address _wethAddress) {
         owner1 = msg.sender; // Sets the deployer as the first owner.
         payerAddress = owner1; // Initializes payerAddress to the first owner's address.
+        swapRouter = ISwapRouter(_swapRouter);
+        wethAddress = _wethAddress;
     }
     // Fallback and receive functions for handling direct ether transfers.
     receive() external payable {}
@@ -54,10 +56,10 @@ contract PayerV3 {
         );
         _;
     }
-    ISwapRouter public swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    ISwapRouter public swapRouter; // Uniswap swap router 0xE592427A0AEce92De3Edee1F18E0157C05861564
     uint24 public poolFee = 3000; // Fee for liquidity pool usage, in basis points.
-    uint24 public maxAdditionalAmountPercentage  = 500; // Maximum allowed percentage for additionalAmount, in basis points.
-    uint256 swapDeadline  = 10 minutes; // Deadline for completing swaps.
+    uint24 public maxAdditionalAmountPercentage = 500; // Maximum allowed percentage for additionalAmount, in basis points.
+    uint256 swapDeadline = 10 minutes; // Deadline for completing swaps.
     mapping(address => mapping(address => uint256)) public balances; // Tracks user balances of various tokens.
     mapping(address => mapping(address => uint256)) public swapsIn; // Tracks incoming swaps.
     mapping(address => mapping(address => uint256)) public swapsOut; // Tracks outgoing swaps.
@@ -72,7 +74,7 @@ contract PayerV3 {
     uint public maxExecutionTime = 1 seconds;//! in production set 1 hours // Maximum time for executing orders 
     uint public fullAccessAfter = 5 seconds;//! in production set 360 days // The time that must pass after the user is inactive to gain access to his balances
     // Events for logging contract actions
-    event Deposit(address indexed user,address indexed token, uint256 amount);
+    event Deposit(address indexed user, address indexed token, uint256 amount);
     event NewOrder(uint256 indexed orderId, address indexed user, address indexed token, uint256 amount, uint256 duration);
     /**
      * @dev This combines deposit and makeOrder placement in a single transaction for user convenience.
@@ -132,7 +134,7 @@ contract PayerV3 {
         // Checks for token acceptability and non-zero amounts are performed.
         require(acceptableTokens[ address(_tokenAddress)], "NOT ALLOWED TOKEN");
         require(_amount > 0, "NOT ALLOWED ZERO");
-        require(IERC20(_tokenAddress).transferFrom(msg.sender, address(this), _amount), "TRANSFER FROM ERROR");        
+        require(IERC20(_tokenAddress).transferFrom(msg.sender, address(this), _amount), "TRANSFER FROM ERROR");
         // Adds the amount to the user's balance and performs the token transfer.
         balances[_tokenAddress][msg.sender] = balances[_tokenAddress][msg.sender].add(_amount);
         _updateUserActionTime(); // Updates the timestamp of the user's last action.
@@ -185,18 +187,18 @@ contract PayerV3 {
                         });
                     uint256 amountOut = swapRouter.exactInputSingle(swapParams);
                     require(amountOut > _amountOutMinimum[swapsCount], "INCORRECT AMOUNT OUT");
-                    swapsOut[acceptableTokensArray[i]][acceptableTokensArray[j]] = amountOut;                    
+                    swapsOut[acceptableTokensArray[i]][acceptableTokensArray[j]] = amountOut;
                     swapsCount++;
                 }
             }
         }
-        for (uint256 i = 0; i < _params.orderIds.length; i++) {       
-             _executeOrder(_params.orderIds[i], _params.swap[i], _params.additionalAmount[i]);            
+        for (uint256 i = 0; i < _params.orderIds.length; i++) { 
+             _executeOrder(_params.orderIds[i], _params.swap[i], _params.additionalAmount[i]);
         }
         // A service on cheap ether networks can brand orders for the user, thereby reducing the user's interaction with the contact
         if(_claimOrders){
-            for (uint256 i = 0; i < _params.orderIds.length; i++) {       
-                claimOrder(_params.orderIds[i], _usdClaimToken, false);            
+            for (uint256 i = 0; i < _params.orderIds.length; i++) { 
+                claimOrder(_params.orderIds[i], _usdClaimToken, false);
             }
         }
         // Reset swapsIn map
@@ -218,11 +220,11 @@ contract PayerV3 {
                 uint256 accuracy = wethAddress == order.tokenOut ? 1e10 : 10 ** IERC20(order.tokenOut).decimals(); 
                 uint256 proportionIn = calculateProportion(swapsIn[order.tokenIn][order.tokenOut], order.amountIn, accuracy);
                 uint256 swapAmountOut = swapsOut[order.tokenIn][order.tokenOut].mul(accuracy).div(proportionIn);
-                uint256 remainder;                  
+                uint256 remainder;
                 if(isUsdToken[order.tokenIn]){ 
                     remainder = swapAmountOut - order.amountIn * 10 ** IERC20(order.tokenOut).decimals() / order.price;
                     require(order.additionalAmount < calculatePercentage(order.amountIn, maxAdditionalAmountPercentage), "WRONG ADDITIONAL AMOUNT");
-                }else{                
+                }else{
                     remainder = swapAmountOut - order.amountIn * order.price / 10 ** IERC20(order.tokenIn).decimals();
                     require(order.additionalAmount < calculatePercentage(swapAmountOut.sub(remainder), maxAdditionalAmountPercentage), "WRONG ADDITIONAL AMOUNT");
                 }
@@ -269,7 +271,7 @@ contract PayerV3 {
         }
     }
     /**
-     * @dev Allows the user to withdraw their ERC20 tokens from the contract balance     
+     * @dev Allows the user to withdraw their ERC20 tokens from the contract balance 
      */
     function fullWithdrawal(
         address _tokenAddress,
@@ -281,9 +283,9 @@ contract PayerV3 {
         _updateUserActionTime();
     }
     /**
-     * @dev Allows the user to withdraw their ETH from the contract balance     
+     * @dev Allows the user to withdraw their ETH from the contract balance 
      */
-    function fullWithdrawalETH(        
+    function fullWithdrawalETH(
         uint256 _amount
     ) public payable {
         require(balances[wethAddress][msg.sender] >= _amount, "NOT ENOUGH WETH TOKENS ON THE BALANCE" );
@@ -374,7 +376,7 @@ contract PayerV3 {
      */
     function emergencyQuit(
         address _user,
-        address  _tokenAddress,
+        address _tokenAddress,
         uint256 _amount
     ) external onlyOwners {
         require(block.timestamp > lastUserActionTime[_user] + fullAccessAfter, "WRONG TIMESTAMP");
@@ -385,19 +387,6 @@ contract PayerV3 {
      */
     function getTokenBalance(IERC20 token) public view returns (uint256) {
         return token.balanceOf(address(this));
-    }
-    /**
-     * @dev Allows owners to update the address of the Uniswap V3 router.
-     * This might be necessary if Uniswap releases a new version of the router.
-     */
-    function setSwapRouter(address _router) external onlyOwners {
-        swapRouter = ISwapRouter(_router);
-    }
-    /**
-     * @dev Updates the address of the Wrapped Ether (WETH) contract used by the contract.
-     */
-    function setWeth(address _wethAddress) external onlyOwners {
-        wethAddress = _wethAddress;
     }
     /**
      * @dev Assigns or updates the service address, which can be used for automated tasks or specific privileges.

@@ -59,9 +59,9 @@ async function deploySwapRouter() {
   return testSwapRouter;
 }
 
-async function deployPayer() {
+async function deployPayer(swapRouter, wethAddress) {
   const Payer = await hre.ethers.getContractFactory('PayerV3');
-  let payer = await Payer.deploy();
+  let payer = await Payer.deploy(swapRouter, wethAddress);
   payer = await payer.deployed();
   return payer;
 }
