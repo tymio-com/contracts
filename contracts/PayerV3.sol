@@ -76,6 +76,9 @@ contract PayerV3 {
     // Events for logging contract actions
     event Deposit(address indexed user, address indexed token, uint256 amount);
     event NewOrder(uint256 indexed orderId, address indexed user, address indexed token, uint256 amount, uint256 duration);
+    event ClaimOrder(uint256 indexed orderId);
+    event FullWithdrawal(address indexed user, address indexed token, uint256 amount);
+    
     /**
      * @dev This combines deposit and makeOrder placement in a single transaction for user convenience.
      * Emits a {Deposit}, {NewOrder} events.
@@ -268,6 +271,7 @@ contract PayerV3 {
         order.claimed = true;
         if(msg.sender == order.user){
             _updateUserActionTime();
+            emit ClaimOrder(_orderId);
         }
     }
     /**
@@ -281,6 +285,7 @@ contract PayerV3 {
         balances[_tokenAddress][msg.sender] = balances[_tokenAddress][msg.sender].sub(_amount);
         IERC20(_tokenAddress).transfer(msg.sender, _amount);
         _updateUserActionTime();
+        emit FullWithdrawal(msg.sender, _tokenAddress, _amount);
     }
     /**
      * @dev Allows the user to withdraw their ETH from the contract balance 
@@ -294,6 +299,7 @@ contract PayerV3 {
         (bool sent, ) = msg.sender.call{value: _amount}("");
         require(sent, "FAILED TO SEND ETHER");
         _updateUserActionTime();
+        emit FullWithdrawal(msg.sender, wethAddress, _amount);
     }
     /**
      * @dev Сalculating the amount from the percentage
