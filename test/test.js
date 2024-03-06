@@ -30,7 +30,7 @@ const {
 const { tokensV1 } = require('./includes/constants');
 const BN = Web3.utils.BN;
 
-let owner,
+let owner1,
   owner2,
   service,
   users,
@@ -47,16 +47,19 @@ describe('Expiration', async () => {
   it('Deploy contracts', async () => {
     tokens = await deployTokens();
     swapRouter = await deploySwapRouter();
-    payer = await deployPayer(swapRouter.address, tokens.weth.address);
+    payer = await deployPayer();
   });
   it('Prepare contract for expiration', async () => {
     expiration = expirations[60];
+    tokens.usdc.minimalAmount = "10000000"
+    tokens.weth.minimalAmount = "2600000000000000"
+    tokens.wbtc.minimalAmount = "14285"
     tokensV3 = {
       USDC: tokens.usdc,
       WETH: tokens.weth,
       WBTC: tokens.wbtc,
       ETH: tokens.weth,
-    };
+    };    
     tokensV3[tokens.usdc.address] = 'USDC';
     tokensV3[tokens.weth.address] = 'WETH';
     tokensV3[tokens.wbtc.address] = 'WBTC';
@@ -64,26 +67,15 @@ describe('Expiration', async () => {
   });
   it('Prepare accounts', async () => {
     signers = await getSigners();
-    service = signers[0];
-    owner = signers[1];
-    owner2 = signers[2];
+    owner1 = signers[0];
+    owner2 = signers[1];
+    service = signers[2];
     users = signers.slice(3)[0];
-    await sendEthForTransfer(owner, tokens.weth.address);
-    await mintTokens([service, owner, owner2, ...users], tokensV3);
+    await sendEthForTransfer(owner1, tokens.weth.address);
+    await mintTokens([service, owner1, owner2, ...users], tokensV3);
   });
   it('Set acceptable tokens', async () => {
     await setAcceptableTokens(payer, tokensV3);
-  });
-  it('Set payer address', async () => {
-    const user = users[0];
-    const args = [owner.address];
-    expect(payer.connect(user).setPayerAddress(...args)).to.be.revertedWith(
-      'NOT THE OWNERS'
-    );
-    tx = await payer.setPayerAddress(...args);
-    tx = await tx.wait();
-    const payerAddress = await payer.payerAddress();
-    expect(payerAddress).to.equal(owner.address);
   });
   it('Replace user addresses', async () => {
     expiration = await replaceUserAddresses(expiration, users);
@@ -93,11 +85,10 @@ describe('Expiration', async () => {
     await setAdditionalAmountToContract(
       payer,
       additionalAmount,
-      owner,
+      owner1,
       tokensV3
     );
     const balance = await payer
-      .connect(owner)
       .getTokenBalance(tokensV3['USDC'].address);
     expect(cToken(balance, 'USDC')).to.equal(additionalAmount);
   });
@@ -203,7 +194,6 @@ describe('Expiration', async () => {
     const newPoolFee = basicPoolFee + 1;
     const args = [newPoolFee];
     const user = users[0];
-
     expect(payer.connect(user).setPoolFee(...args)).to.be.revertedWith(
       'NOT THE OWNERS'
     );
@@ -211,61 +201,57 @@ describe('Expiration', async () => {
     const poolFee = await payer.poolFee();
     expect(poolFee).to.equal(newPoolFee);
   });
-  it('Set max additional amount percentage', async () => {
-    const basicMaxAdditionalAmountPercentage =
-      await payer.maxAdditionalAmountPercentage();
-    const newMaxAdditionalAmountPercentage =
-      basicMaxAdditionalAmountPercentage + 1;
-    const args = [newMaxAdditionalAmountPercentage];
-    const user = users[0];
-
-    expect(
-      payer.connect(user).setMaxAdditionalAmountPercentage(...args)
-    ).to.be.revertedWith('NOT THE OWNERS');
-    await payer.setMaxAdditionalAmountPercentage(...args);
-    const maxAdditionalAmountPercentage =
-      await payer.maxAdditionalAmountPercentage();
-    expect(maxAdditionalAmountPercentage).to.equal(
-      newMaxAdditionalAmountPercentage
-    );
-  });
   it('Set owner1 address', async () => {
-    const args = [service.address];
+    const newOwner = users[1];
+    const args = [newOwner.address];
     const user = users[0];
     expect(payer.connect(user).setOwner1Address(...args)).to.be.revertedWith(
       'NOT THE OWNERS'
     );
     await payer.setOwner1Address(...args);
-    const owner1 = await payer.owner1();
-    expect(owner1).to.equal(service.address);
+    const contractOwner1 = await payer.owner1();
+    expect(contractOwner1).to.equal(newOwner.address);
+    await payer.connect(newOwner).setOwner1Address(owner1.address);
   });
   it('Set owner2 address', async () => {
-    const args = [owner.address];
+    const args = [owner2.address];
     const user = users[0];
     expect(payer.connect(user).setOwner2Address(...args)).to.be.revertedWith(
       'NOT THE OWNERS'
     );
     await payer.setOwner2Address(...args);
-    const owner2 = await payer.owner2();
-    expect(owner2).to.equal(owner.address);
+    const contractOwner2 = await payer.owner2();
+    expect(contractOwner2).to.equal(owner2.address);
+  });
+  it('Set payer address', async () => {
+    const user = users[1];
+    expect(payer.connect(user).setPayerAddress()).to.be.revertedWith(
+      'NOT THE OWNERS'
+    );
+    tx = await payer.connect(owner2).setPayerAddress();
+    tx = await tx.wait();
+    const payerAddress = await payer.payerAddress();
+    expect(payerAddress).to.equal(owner2.address);
+    tx = await payer.connect(owner1).setPayerAddress();
+    tx = await tx.wait();
   });
   it('Set service address', async () => {
-    const args = [owner2.address];
+    const args = [service.address];
     const user = users[0];
     expect(payer.connect(user).setServiceAddress(...args)).to.be.revertedWith(
       'NOT THE OWNERS'
     );
     await payer.setServiceAddress(...args);
     const serviceAddress = await payer.service();
-    expect(serviceAddress).to.equal(owner2.address);
+    expect(serviceAddress).to.equal(service.address);
   });
   it('Get eth balance', async () => {
-    await owner.sendTransaction({ to: payer.address, value: sToken(1, 'ETH') });
+    await owner1.sendTransaction({ to: payer.address, value: sToken(1, 'ETH') });
     ethBalance = await payer.getEthBalance();
     expect(ethBalance).to.equal(sToken(1, 'ETH'));
   });
   it('Get back eth', async () => {
-    const args = [owner.address, ethBalance];
+    const args = [owner1.address, ethBalance];
     const user = users[0];
     expect(payer.connect(user).getBackEth(...args)).to.be.revertedWith(
       'NOT THE OWNERS'
@@ -275,22 +261,28 @@ describe('Expiration', async () => {
     expect(cToken(ethBalance, 'ETH')).to.equal(cToken(0, 'ETH'));
   });
   it('Edit acceptable token', async () => {
-    const args = [tokensV3['WBTC'].address, false, false];
+    const args = [tokensV3['WBTC'].address, false, false, tokensV3['WBTC'].minimalAmount];
     const user = users[0];
     expect(payer.connect(user).editAcceptableToken(...args)).to.be.revertedWith(
       'NOT THE OWNERS'
     );
-    await payer.connect(owner).editAcceptableToken(...args);
+    await payer.editAcceptableToken(...args);
+    expect(payer.editAcceptableToken(tokensV3['WBTC'].address, true, false, 0)).to.be.revertedWith(
+      'NOT ALLOWED ZERO'
+    );
     expect(await payer.acceptableTokensArray(0)).to.equal(
       tokensV3['USDC'].address
     );
     expect(await payer.acceptableTokensArray(1)).to.equal(
       tokensV3['WETH'].address
     );
-    tx = await payer.editAcceptableToken(tokensV3['WBTC'].address, true, false);
+    tx = await payer.editAcceptableToken(tokensV3['WBTC'].address, true, false, tokensV3['WBTC'].minimalAmount);
     await tx.wait();
     expect(await payer.acceptableTokensArray(2)).to.equal(
       tokensV3['WBTC'].address
+    );
+    expect(payer.editAcceptableToken(tokensV3['USDC'].address, true, true, tokensV3['USDC'].minimalAmount)).to.be.revertedWith(
+      'DUPLICATE TOKEN'
     );
   });
   it("If the order wasn't completed in time, revert to the original token and amount", async () => {
@@ -455,7 +447,7 @@ describe('Expiration', async () => {
       tokensV3
     );
     await wait(expirationDuration);
-    await executeOrders(payer, args, swapOutMinimal, true, tokensV3, owner);
+    await executeOrders(payer, args, swapOutMinimal, true, tokensV3, owner1);
   });
   it('Deposit 0 eth exception', async () => {
     const user = users[0];
@@ -486,7 +478,7 @@ describe('Expiration', async () => {
     const amountIn = sToken(500, 'USDC');
     const price = 2500;
     let duration = 1;
-
+    const wrongAmountIn = 1
     const balanceUsdc = await payer.balanceOf(tokenAddressIn, user.address);
     tx = await payer.connect(user).fullWithdrawal(tokenAddressIn, balanceUsdc);
     tx = await tx.wait();
@@ -496,7 +488,7 @@ describe('Expiration', async () => {
         .connect(user)
         .makeOrder(tokenAddressIn, tokenAddressOut, amountIn, price, duration)
     ).to.be.revertedWith('NO TOKEN BALANCE');
-
+      
     await mintTokens([user], tokensV3);
     expect(
       payer.connect(user).deposit(tokenAddressIn, amountIn)
@@ -505,16 +497,21 @@ describe('Expiration', async () => {
     tx = await tx.wait();
     tx = await payer.connect(user).deposit(tokenAddressIn, amountIn);
     tx = await tx.wait();
-
     expect(
       payer
         .connect(user)
         .makeOrder(tokenAddressIn, tokenAddressOut, amountIn, price, duration)
     ).to.be.revertedWith('SAME TOKENS');
+    tokenAddressOut = tokensV3['WETH'].address;
+    expect(
+      payer
+        .connect(user)
+        .makeOrder(tokenAddressIn, tokenAddressOut, wrongAmountIn, price, duration)
+    ).to.be.revertedWith('WRONG AMOUNT');
 
     const maxDuration = await payer.maxDuration();
     duration += Number(maxDuration.toString());
-    tokenAddressOut = tokensV3['WETH'].address;
+
     expect(
       payer
         .connect(user)

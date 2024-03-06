@@ -70,6 +70,7 @@ async function postOrders(payer, expiration, orderDuration, tokensV3) {
           _tokenAddressIn,
           _tokenAddressOut,
           _amount,
+          _amount,
           _price,
           _duration
         );

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity >=0.7.5 <0.9.0;
+pragma solidity =0.8.20;
 pragma abicoder v2;
+import "hardhat/console.sol";
 interface IERC20Debug {
     function balanceOf(address account) external view returns (uint256);
     function approve(address account, uint amount) external returns (bool);
@@ -34,7 +35,7 @@ contract TestSwapRouter {
     {
         IERC20Debug tokenIn = IERC20Debug(params.tokenIn);
         IERC20Debug tokenOut = IERC20Debug(params.tokenOut);
-        tokenIn.burn(msg.sender, params.amountIn);        
+        tokenIn.transferFrom(address(msg.sender), address(this), params.amountIn);
         amountOut = calcAmount(params.tokenIn, params.tokenOut, params.amountIn );
         tokenOut.mint(msg.sender, amountOut);
     }

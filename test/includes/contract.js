@@ -3,11 +3,11 @@ const { DECIMALS } = require('./constants');
 const { sToken, thowDotPart, cToken, roudToDecimals } = require('./utils');
 
 async function setAcceptableTokens(payer, tokens) {
-  tx = await payer.editAcceptableToken(tokens['USDC'].address, true, true);
+  tx = await payer.editAcceptableToken(tokens['USDC'].address, true, true, tokens['USDC'].minimalAmount);
   await tx.wait();
-  tx = await payer.editAcceptableToken(tokens['WETH'].address, true, false);
+  tx = await payer.editAcceptableToken(tokens['WETH'].address, true, false, tokens['WETH'].minimalAmount);
   await tx.wait();
-  tx = await payer.editAcceptableToken(tokens['WBTC'].address, true, false);
+  tx = await payer.editAcceptableToken(tokens['WBTC'].address, true, false, tokens['WBTC'].minimalAmount);
   await tx.wait();
   expect(await payer.acceptableTokensArray(0)).to.equal(tokens['USDC'].address);
   expect(await payer.acceptableTokensArray(1)).to.equal(tokens['WETH'].address);

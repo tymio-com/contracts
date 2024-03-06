@@ -13,8 +13,8 @@ module.exports = {
   solidity: {
     compilers: [
       {
-        version: '0.7.5',
-        settings: { optimizer: { enabled: true, runs: 200 } },
+        version: '0.8.20',
+        settings: { optimizer: { enabled: true, runs: 50000 } },
       }
     ],
   },
@@ -23,7 +23,7 @@ module.exports = {
     hardhat: {
       throwOnTransactionFailures: true,
       throwOnCallFailures: true,
-      allowUnlimitedContractSize: true,
+      allowUnlimitedContractSize: false,
       accounts: { count: 100 },
     }
   },
