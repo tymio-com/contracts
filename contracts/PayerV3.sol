@@ -181,6 +181,7 @@ contract PayerV3 {
                 false
             )
         );
+        _updateUserActionTime(); // Updates the timestamp of the user's last action.
         emit NewOrder(
             orders.length - 1,
             msg.sender,
